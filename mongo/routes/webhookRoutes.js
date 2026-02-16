@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const Order = require("../models/Order");
 const WebhookEvent = require("../models/WebhookEvent");
+const prisma = require("../config/prisma");
 
 const router = express.Router();
 
@@ -33,6 +34,39 @@ router.post(
     const orderId =
       event.payload.payment?.entity?.order_id ||
       event.payload.refund?.entity?.order_id;
+
+    // Subscription Events
+    if (event.event.startsWith("subscription.")) {
+      const subId = event.payload.subscription.entity.id;
+
+      if (event.event === "subscription.activated") {
+        await prisma.coffeeSubscription.update({
+          where: { razorpaySubscriptionId: subId },
+          data: { status: "active" },
+        });
+      }
+
+      if (event.event === "subscription.halted") {
+        await prisma.coffeeSubscription.update({
+          where: { razorpaySubscriptionId: subId },
+          data: { status: "halted" },
+        });
+      }
+
+      if (event.event === "subscription.cancelled") {
+        await prisma.coffeeSubscription.update({
+          where: { razorpaySubscriptionId: subId },
+          data: { status: "cancelled" },
+        });
+      }
+
+      if (event.event === "subscription.completed") {
+        await prisma.coffeeSubscription.update({
+          where: { razorpaySubscriptionId: subId },
+          data: { status: "completed" },
+        });
+      }
+    }
 
     if (event.event === "payment.captured")
       await Order.updateOne({ razorpay_order_id: orderId }, { status: "paid" });
